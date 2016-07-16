@@ -1,3 +1,4 @@
+from __future__ import print_function
 from random import choice
 from math import ceil
 from itertools import cycle
@@ -7,9 +8,9 @@ class pit():
     We assume locations are a grid overlaying the circular pit,
     so we flag some locations as unusable (the corners) by placing an 'X' there.
     All other locations receive a list of stones'''
-    
+
     def __init__(self, id=-1, n=4, player=1, n_target_pos=48, target=False):
-        '''Create a bao pit. 
+        '''Create a bao pit.
         There should be an even number of pits.
         Pits should be numbered sequentially.
         Each pit belongs to a particular player (below half = player 1. Above = player 2)
@@ -33,14 +34,14 @@ class pit():
         self.loc[-n] = 'X'
         self.target = target
         self.player = player
-        
+
     def __repr__(self):
         return '{}: {} {}'.format(self.id, self.count_stones(), ('(T)' if self.target else ''))
 
     def pretty_print(self):
         '''pretty-print a pit.
         dots indicate empty locations.
-        numbers indicate the number of stones at that position.''' 
+        numbers indicate the number of stones at that position.'''
         s = ''
         for x in range(self.rows):
             for y in range(self.cols):
@@ -54,7 +55,7 @@ class pit():
             s += '\n'
         s +='{}: p{} {}'.format(self.id, self.player, ('(T)' if self.target else ''))
         print(s)
-        
+
     def free_locations(self, reuse=False):
         '''return a list of all empty locations in this pit.
         Useful in conjunction with `random.choice()`
@@ -67,9 +68,14 @@ class pit():
             elif reuse == False and len(contents) == 0:
                 ret += [i]
         return ret
-    
-    def add(self, stone):
-        '''Add the supplied stone to this pit'''
+
+    def add(self, stone, debug=False):
+        '''Add the supplied stone to this pit.
+        Stone should be currently unallocated. Add will fail (return False) if stone is already positioned somewhere '''
+        if stone.pit is not None:
+            raise RuntimeError, "Tried to add stone to pit {} that is already placed in pit {}".format(self.id, stone.pit)
+            return False
+
         free = self.free_locations()
         if (len(free)):
             loc = choice(free)
@@ -77,16 +83,22 @@ class pit():
             # no locations free
             free = self.free_locations(reuse=True)
             loc = choice(free)
-            
+
         stone.position = loc
         stone.pit = self.id
         self.loc[loc].append(stone)
-        
-    def pickup_stones(self):
+        return True
+
+    def pickup_stones(self, debug=False):
         '''pick-up all stones in this pit (i.e. their location becomes None'''
-        for i, stones in enumerate(self.loc):
+        for i, stone_l in enumerate(self.loc):
+            stones = stone_l[:] # make a copy: we need to mutate the list
             if (stones != 'X') and (len(stones) > 0):
                 for stone in stones:
+                    if (stone.pit != self.id):
+                        raise RuntimeError, 'Stone {} has pit_id {}, but being removed from {}'.format(stone.id, stone.pit, self.id)
+                    if debug:
+                        print('Removing stone {} from pit {}, loc {}'.format(stone.id, self.id, stone.position))
                     stone.pit = None
                     stone.position = None
                     self.loc[i].remove(stone)
@@ -102,7 +114,7 @@ class pit():
         if debug:
             print()
         return c
-        
+
 
 class stone():
     '''Object representing a stone (marker, or seed) in a game of bao'''
@@ -122,7 +134,7 @@ class stone():
 
     def __repr__(self):
         return '(id={}, pit={}, pos={}, color={})'.format(self.id, self.pit, self.position, self.color)
-    
+
 
 class bao_game():
     def __init__(self, n_stones=36, n_pits=6, n_rows=1):
@@ -146,9 +158,9 @@ class bao_game():
         for p in self.pits:
             if p.target:
                 self.targets[p.player] = p.id
-        
+
     def __repr__(self):
-        '''Text representation of the game board''' 
+        '''Text representation of the game board'''
         s = '\t\t'
         for i in range(self.n_pits + 1):
             s += str(self.pits[i]) + '\t'
@@ -156,12 +168,12 @@ class bao_game():
         for i in range(2 * self.n_pits + 1, self.n_pits, -1):
             s += str(self.pits[i]) + '\t'
         return s + '\nNext: Player {} \tGame State: {}\n'.format(self.current_player, 'Game Over' if self.game_over else 'Playing')
-    
+
     def initial_place(self, debug=False, direction='ccw'):
-        '''Do the initial placement (sowing) of stones. 
+        '''Do the initial placement (sowing) of stones.
         Place one in each non-target pit until all stones have been placed.
         * `direction` is currently unused'''
-        
+
         unplaced = (stone for stone in self.stones if stone.pit is None)
         p = 0
         try:
@@ -172,11 +184,11 @@ class bao_game():
                 if debug:
                     print('Placing stone {} in pit {}'.format(stone.id, self.pits[p].id))
                 self.pits[p].add(stone)
-                stone.color = '#6666af' if self.pits[p].player == 1 else '#75755e' 
+                stone.color = '#6666af' if self.pits[p].player == 1 else '#75755e'
                 p = (p + 1) % len(self.pits)
         except StopIteration:
             pass
-            
+
     def is_player_target(self, pit_id):
         '''return True if the supplied `pid_id` is the current player's target pit'''
         if self.pits[pit_id].target and self.pits[pit_id].player == self.current_player:
@@ -194,13 +206,13 @@ class bao_game():
         while True:
             yield 1
             yield 2
-            
+
     def random_move(self):
         '''choose a (valid) random move for the active player'''
         pits_remaining = [p for p in self.pits if p.player == self.current_player and p.target != True and p.count_stones()]
         move = choice(pits_remaining)
         return move.id
-            
+
     def sow(self, pit_id, direction='ccw', debug=False):
         '''Current player picks up the seeds in pit `pit_id`,
         sowing in the direction specified by `direction`
@@ -235,7 +247,7 @@ class bao_game():
             next_player = self.current_player
         else:
             next_player = self.get_player.next()
-        
+
             # compute captures
             if self.pits[last_p].player == self.current_player: # my pit
                 if self.pits[last_p].count_stones() == 1: # potential capture
@@ -311,7 +323,22 @@ def random_game(bao = None, debug=False):
         if debug:
             print("Player {}: {}".format(player, pscore))
         scores.append(pscore)
-    return (move_list, scores)
+    bao.move_list = move_list
+    return (bao, scores)
+
+
+def check_game(bao, scores):
+    '''Run consistency checks on a game.
+    Raise exceptions on any issues.'''
+    if bao.game_over:
+        # End of game checks
+
+        # score should add to number of stones
+        if sum(scores) != len(bao.stones):
+            raise RuntimeError, "Final score {} doesn't sum to {}".format(scores, len(bao.stones))
+
+
+    # test addition, removal
 
 
 def play_game(move_list, debug=False):
@@ -335,3 +362,37 @@ def play_game(move_list, debug=False):
             print("Player {}: {}".format(player, pscore))
         scores.append(pscore)
     return (bao, scores)
+
+if __name__ == '__main__':
+
+    # Known Test cases
+    tests = []
+    tests.append(("All positions full error", [1, 9, 2, 0, 7, 3, 11, 0, 10, 1, 11, 4, 7, 5, 11, 8, 0, 7, 3, 11, 2, 5, 4, 9, 1, 11]))
+    tests.append(("Game ends with all positions full in a pit", [2, 9, 0, 12, 0, 11, 0, 7, 2, 12, 9, 5, 9, 4, 7, 5, 1, 9, 2, 10, 0, 7, 2, 12, 4, 0, 11, 8, 2, 10, 1, 9, 4, 11, 12, 1]))
+    tests.append(("Game ends leaving pieces on the board", [4, 9, 2, 7, 1, 12, 3, 10, 5, 12, 10, 2, 8, 1, 12, 7, 2, 8, 4, 10, 0, 3, 7, 1, 9, 0, 10, 4, 1, 12, 8, 3, 9, 4, 10, 5, 9]))
+
+    for tc in tests:
+        bao, scores = play_game(tc[1])
+        check_game(bao, scores)
+
+    # Random Games
+
+    for gno in range(1000):
+        bao, score = random_game()
+        check_game(bao, score)
+
+    # test pickup_stones bug (not all stones were picked up) by re-adding everything a 2nd time
+
+    p = pit(id=1)
+    ss = [stone(id=i) for i in range(16)]
+    for s in ss:
+        p.add(s)
+    p.pickup_stones()
+    for s in ss:
+        p.add(s)
+    p.pickup_stones()
+    left = p.count_stones()
+    if left:
+        print("Should be no stones left. Found {}".format(left))
+        p.pretty_print()
+        print([s for s in ss if s.pit is not None])
