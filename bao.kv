@@ -1,0 +1,81 @@
+#:include debug.kv
+#:include grids.kv
+
+<BaoGame>:
+    id: _game
+    orientation: 'vertical'
+    canvas.before:
+        Color:
+            rgba: 1,1,1,1
+        Rectangle:
+            size: self.size
+            pos: self.pos
+    BoxLayout:
+        id: _toolbar
+        size_hint: 1, 0.1
+        DebugLabel:
+            text: 'toolbar'
+    FloatLayout:
+        id: _game_area
+        Image:
+            id: _game_board
+            source: 'assets/graphics/bao-board-2-6.png'
+        BoxLayout:
+            id: _board_overlay
+            orientation: 'horizontal'
+            game_board: _game_board
+            size_hint: None, None
+            size: self.game_board.norm_image_size
+            pos_hint: {'center_x': 0.5, 'center_y': 0.5}
+            padding: [self.width * 0.01, self.height * 0.18]
+            spacing: self.width * 0.01
+            Grid64:
+                game_ovl: _board_overlay
+                padding: [self.game_ovl.width * 0.02, self.game_ovl.height * 0.01]
+            GridLayout:
+                size_hint: 6,1
+                game_ovl: _board_overlay
+                padding: [self.game_ovl.width * 0.008, self.game_ovl.height * 0.012]
+                spacing: [self.game_ovl.width * 0.034, self.game_ovl.height * 0.16]
+                cols: 6
+                Grid16:
+                    player:1
+                    pot:0
+                Grid16:
+                    player:1
+                    pot:1
+                Grid16:
+                    player:1
+                    pot:2
+                Grid16:
+                    player:1
+                    pot:3
+                Grid16:
+                    player:1
+                    pot:4
+                Grid16:
+                    player:1
+                    pot:5
+                Grid16:
+                    player:2
+                    pot:0
+                Grid16:
+                    player:2
+                    pot:1
+                Grid16:
+                    player:2
+                    pot:2
+                Grid16:
+                    player:2
+                    pot:3
+                Grid16:
+                    player:2
+                    pot:4
+                Grid16:
+                    player:2
+                    pot:5
+            Grid64:
+                game_ovl: _board_overlay
+                padding: [self.game_ovl.width * 0.02, self.game_ovl.height * 0.01]
+
+        
