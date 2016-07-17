@@ -6,8 +6,11 @@ from __future__ import print_function
 from random import choice
 from math import ceil
 from itertools import cycle
+from operator import sub
+import json
 
-class pit():
+
+class Pit():
     '''Represent a pit in a mankala (bao) style game.
     We assume locations are a grid overlaying the circular pit,
     so we flag some locations as unusable (the corners) by placing an 'X' there.
@@ -120,7 +123,7 @@ class pit():
         return c
 
 
-class stone():
+class Stone():
     '''Object representing a stone (marker, or seed) in a game of bao'''
     def __init__(self, color=None, id=-1):
         '''Create a bao stone.
@@ -139,17 +142,17 @@ class stone():
     def __repr__(self):
         return '(id={}, pit={}, pos={}, color={})'.format(self.id, self.pit, self.position, self.color)
 
-class bao_game():
+class Game():
     def __init__(self, n_stones=36, n_pits=6, n_rows=1):
         '''Create a bao game.
         * `n_pits` is the number of (non-target) pits per player
         * `n_rows` is the rows of pits per player (not currently used)
         * `n_stones` is the number of stones (seeds) that the game starts with'''
-        self.game_over = False
+        self.game_over = True
         self.n_rows = n_rows
         self.n_pits = n_pits
-        self.stones = [stone(id=i) for i in range(n_stones)]
-        self.pits = [pit(target=(i%(n_pits+1) == n_pits),
+        self.stones = [Stone(id=i) for i in range(n_stones)]
+        self.pits = [Pit(target=(i%(n_pits+1) == n_pits),
                       player=(1 if i <= n_pits else 2),
                       id=i) for i in range(2*n_pits + 2)]
         self.targets = {}
@@ -190,8 +193,17 @@ class bao_game():
 
     def initial_place(self, debug=False, direction='ccw'):
         '''Do the initial placement (sowing) of stones.
+        This can only be done if the current game is over.
         Place one in each non-target pit until all stones have been placed.
-        * `direction` is currently unused'''
+        * `direction` is currently unused. If game is already initialized,
+        do nothing.'''
+
+        if self.game_over == False:
+            return
+
+        # pick everything up
+        for p in self.pits:
+            p.pickup_stones()
 
         unplaced = (stone for stone in self.stones if stone.pit is None)
         p = 0
@@ -207,6 +219,7 @@ class bao_game():
                 p = (p + 1) % len(self.pits)
         except StopIteration:
             pass
+        self.game_over = False
 
     def is_player_target(self, pit_id):
         '''return True if the supplied `pid_id` is the current player's target pit'''
@@ -299,11 +312,16 @@ class bao_game():
 
         self.game_over = True
 
-    def update_player(self):
+    def update_player(self, debug=False):
+        if debug:
+            print('Current player: {}'.format(self.current_player))
         if self.last_pit is None:
             raise RuntimeError, 'update_player called and last_pit is None'
         if not self.is_player_target(self.last_pit):
             self.current_player = self.get_player.next()
+        if debug:
+            print('Toggle player? {}'.format(not self.is_player_target(self.last_pit)))
+            print('New player? {}'.format(self.current_player))
         self.last_pit = None
 
 
@@ -346,7 +364,19 @@ class bao_game():
             pass
 
         self.last_pit = last_p
-        # compute next player
+
+        return True
+
+    def play_round(self, pit_no, direction='ccw', debug=False):
+        '''Play a round of bao. Sow, starting at `pit_no`
+        * `direction` is currently ignored.
+        If the indicated move is invalid, return None.
+        Otherwise, return the game status, current player, and stones list.
+        '''
+        success = self.sow(pit_no, direction, debug)
+
+        if not success: # not a valid move
+            return None
 
         self.perform_captures()
 
@@ -357,85 +387,108 @@ class bao_game():
         return (self.game_over, self.current_player, self.stones)
 
 
-def random_game(bao = None, debug=False):
+
+def random_game(bg=None, debug=False):
     '''Play a game of bao to completion by choosing (valid) moves at random.
     If `bao` is passed, the game will be played at random from the supplied position.
     `debug = True` makes for more verbose output (e.g. prints the board after each move)
     '''
     move_list = []
-    if bao is None:
-        bao=bao_game()
-        bao.initial_place()
+    if bg is None:
+        bg=Game()
+        bg.initial_place()
     if debug:
-        print(bao)
-    player = bao.current_player
+        print(bg)
+    player = bg.current_player
     mno = 1
-    move = bao.random_move()
+    move = bg.random_move()
     move_list += [move]
     if debug:
         print ('Move {}: Player {} sows {}'.format(mno, player, move))
-    (done, player, stones) = bao.sow(move)
+    (done, player, stones) = bg.play_round(move)
     while not done:
         if debug:
-            print(bao)
-        move = bao.random_move()
+            print(bg)
+        move = bg.random_move()
         move_list += [move]
         mno = mno + 1
         if debug:
             print ('Move {}: Player {} sows {}'.format(mno, player, move))
         try:
-            (done, player, stones) = bao.sow(move)
+            (done, player, stones) = bg.play_round(move)
         except:
             raise RuntimeError, "Error on game: {}".format(move_list)
 
     if debug:
-        print(bao)
+        print(bg)
         print('Final score:')
     scores = []
     for player in [1,2]:
-        pscore = bao.pits[bao.targets[player]].count_stones()
+        pscore = bg.pits[bg.targets[player]].count_stones()
         if debug:
             print("Player {}: {}".format(player, pscore))
         scores.append(pscore)
-    bao.move_list = move_list
-    return (bao, scores)
+    bg.move_list = move_list
+    return (bg, scores)
 
 
-def check_game(bao, scores):
+def check_game(bao_game, scores):
     '''Run consistency checks on a game.
     Raise exceptions on any issues.'''
-    if bao.game_over:
+    if bao_game.game_over:
         # End of game checks
 
         # score should add to number of stones
-        if sum(scores) != len(bao.stones):
-            raise RuntimeError, "Final score {} doesn't sum to {}".format(scores, len(bao.stones))
-
-
-    # test addition, removal
+        if sum(scores) != len(bao_game.stones):
+            raise RuntimeError, "Final score {} doesn't sum to {}".format(scores, len(bao_game.stones))
 
 
 def play_game(move_list, debug=False):
     '''Play a new game of bao with the specified move list.
     Returns the bao game, and the score after all moves are completed.
     '''
-    bao=bao_game()
-    bao.initial_place()
+    bg = Game()
+    bg.initial_place()
     mno = 1
     for move in move_list:
         if debug:
-            print('Player {} sows {}'.format(bao.current_player, move))
-        bao.sow(move)
+            print('Player {} sows {}'.format(bg.current_player, move))
+        bg.play_round(move)
         if debug:
-            print(bao)
+            print(bg)
 
     scores = []
     for player in [1,2]:
-        pscore = bao.pits[bao.targets[player]].count_stones()
+        pscore = bg.pits[bg.targets[player]].count_stones()
         if debug:
             print("Player {}: {}".format(player, pscore))
         scores.append(pscore)
-    return (bao, scores)
+    return (bg, scores)
+
+def generate_test_vectors(self, n=50, filename='test_vectors.json'):
+    test_vectors = []
+    for i in range(n):
+        bg = bao.bao_game()
+        bg.initial_place()
+        bao.random_game(bg=bg)
+        test_vectors.append((bg.move_list, bg.score))
+
+    with open(filename, 'w') as fp:
+        json.dump(test_vectors, fp)
+
+
+def verify_test_vectors(self, filename='test_vectors.json'):
+    '''evaluate test vectors, consisting of tuples:
+       [move list], [p1_score, p2_score]
+    Basically, run the supplied moves, and ensure the new score matches the old
+    '''
+    with open('test_vectors.json', 'r') as fr:
+        tv = json.load(fr)
+        for (ml, score) in tv:
+            b,s = play_game(ml)
+            if sum(tuple(map(sub, score, s))) != 0:
+                raise RuntimeError, 'New score {} != {}. for test moves {}'.format(s, score, ml)
+
 
 if __name__ == '__main__':
 
@@ -446,19 +499,19 @@ if __name__ == '__main__':
     tests.append(("Game ends leaving pieces on the board", [4, 9, 2, 7, 1, 12, 3, 10, 5, 12, 10, 2, 8, 1, 12, 7, 2, 8, 4, 10, 0, 3, 7, 1, 9, 0, 10, 4, 1, 12, 8, 3, 9, 4, 10, 5, 9]))
 
     for tc in tests:
-        bao, scores = play_game(tc[1])
-        check_game(bao, scores)
+        bg, scores = play_game(tc[1])
+        check_game(bg, scores)
 
     # Random Games
 
     for gno in range(100):
-        bao, score = random_game()
-        check_game(bao, score)
+        bg, score = random_game()
+        check_game(bg, score)
 
     # test pickup_stones bug (not all stones were picked up) by re-adding everything a 2nd time
 
-    p = pit(id=1)
-    ss = [stone(id=i) for i in range(16)]
+    p = Pit(id=1)
+    ss = [Stone(id=i) for i in range(16)]
     for s in ss:
         p.add(s)
     p.pickup_stones()
