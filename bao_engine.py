@@ -451,7 +451,7 @@ if __name__ == '__main__':
 
     # Random Games
 
-    for gno in range(1000):
+    for gno in range(100):
         bao, score = random_game()
         check_game(bao, score)
 
@@ -470,3 +470,13 @@ if __name__ == '__main__':
         print("Should be no stones left. Found {}".format(left))
         p.pretty_print()
         print([s for s in ss if s.pit is not None])
+
+    # known test vectors
+    import json
+    from kivy.vector import Vector
+    with open('testvectors.json', 'r') as fr:
+        tv = json.load(fr)
+        for (ml, score) in tv:
+            b,s = play_game(ml)
+            if sum(Vector(score) - s) != 0:
+                raise RuntimeError, 'New score {} != {}. for test moves {}'.format(s, score, ml)
