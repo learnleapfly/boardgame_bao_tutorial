@@ -1,20 +1,27 @@
 #:include debug.kv
-#:include grids.kv
-
 <BaoGame>:
     id: _game
     orientation: 'vertical'
+
     canvas.before:
         Color:
             rgba: 1,1,1,1
         Rectangle:
             size: self.size
             pos: self.pos
+
+    board_overlay: _board_overlay
+    toolbar: _toolbar
+
     BoxLayout:
         id: _toolbar
+        start_button: _start_button
         size_hint: 1, 0.1
-        DebugLabel:
-            text: 'toolbar'
+        Button:
+            id: _start_button
+            text: 'Start Game'
+            on_release: root.start_game()
+
     FloatLayout:
         id: _game_area
         Image:
@@ -29,53 +36,66 @@
             pos_hint: {'center_x': 0.5, 'center_y': 0.5}
             padding: [self.width * 0.01, self.height * 0.18]
             spacing: self.width * 0.01
-            Grid64:
-                game_ovl: _board_overlay
-                padding: [self.game_ovl.width * 0.02, self.game_ovl.height * 0.01]
-            GridLayout:
-                size_hint: 6,1
-                game_ovl: _board_overlay
-                padding: [self.game_ovl.width * 0.008, self.game_ovl.height * 0.012]
-                spacing: [self.game_ovl.width * 0.034, self.game_ovl.height * 0.16]
-                cols: 6
-                Grid16:
-                    player:1
-                    pot:0
-                Grid16:
-                    player:1
-                    pot:1
-                Grid16:
-                    player:1
-                    pot:2
-                Grid16:
-                    player:1
-                    pot:3
-                Grid16:
-                    player:1
-                    pot:4
-                Grid16:
-                    player:1
-                    pot:5
-                Grid16:
-                    player:2
-                    pot:0
-                Grid16:
-                    player:2
-                    pot:1
-                Grid16:
-                    player:2
-                    pot:2
-                Grid16:
-                    player:2
-                    pot:3
-                Grid16:
-                    player:2
-                    pot:4
-                Grid16:
-                    player:2
-                    pot:5
-            Grid64:
-                game_ovl: _board_overlay
-                padding: [self.game_ovl.width * 0.02, self.game_ovl.height * 0.01]
+            Pit:
+                padding: [self.parent.parent.width * 0.018, self.parent.parent.height * 0.02]
+                pit_id: 13
+                text: str(self.pit_id)
 
-        
+            GridLayout:
+                id: _player_pits
+                size_hint: 6,1
+                cols: 6
+                padding: [self.parent.width * 0.008, self.parent.height * 0.012]
+                spacing: [self.parent.width * 0.034, self.parent.height * 0.16]
+                Pit:
+                    pit_id:12
+                    text: str(self.pit_id)
+                Pit:
+                    pit_id:11
+                    text: str(self.pit_id)
+                Pit:
+                    pit_id:10
+                    text: str(self.pit_id)
+                Pit:
+                    pit_id:9
+                    text: str(self.pit_id)
+                Pit:
+                    pit_id:8
+                    text: str(self.pit_id)
+                Pit:
+                    pit_id:7
+                    text: str(self.pit_id)
+                Pit:
+                    pit_id:0
+                    text: str(self.pit_id)
+                Pit:
+                    pit_id:1
+                    text: str(self.pit_id)
+                Pit:
+                    pit_id:2
+                    text: str(self.pit_id)
+                Pit:
+                    pit_id:3
+                    text: str(self.pit_id)
+                Pit:
+                    pit_id:4
+                    text: str(self.pit_id)
+                Pit:
+                    pit_id:5
+                    text: str(self.pit_id)
+            Pit:
+                padding: [self.parent.parent.width * 0.018, self.parent.parent.height * 0.02]
+                pit_id:6
+                text: str(self.pit_id)
+
+<Pit>:
+    id: _pit
+    text: ''
+    FloatLayout:
+        size: self.size
+        pos: self.pos
+        DebugLabel:
+            size: self.parent.size
+            pos: self.parent.pos
+            text: root.text
+            on_release: root.choose_pit()
