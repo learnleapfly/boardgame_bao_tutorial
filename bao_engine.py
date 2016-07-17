@@ -1,3 +1,7 @@
+# file: bao_engine.py
+# copyright: Copyright (C) 2016 Kjell Wooding
+# license:  MIT. See LICENSE for complete license text
+
 from __future__ import print_function
 from random import choice
 from math import ceil
@@ -134,7 +138,6 @@ class stone():
 
     def __repr__(self):
         return '(id={}, pit={}, pos={}, color={})'.format(self.id, self.pit, self.position, self.color)
-
 
 class bao_game():
     def __init__(self, n_stones=36, n_pits=6, n_rows=1):
