@@ -58,7 +58,7 @@ class pit():
                     s += '.'
             s += '\n'
         s +='{}: p{} {}'.format(self.id, self.player, ('(T)' if self.target else ''))
-        print(s)
+        print(s + '\n')
 
     def free_locations(self, reuse=False):
         '''return a list of all empty locations in this pit.
@@ -154,6 +154,10 @@ class bao_game():
                       id=i) for i in range(2*n_pits + 2)]
         self.targets = {}
 
+        # State variables for moving, capturing
+        self.captures_done = True
+        self.last_pit = None
+
         #self.get_player = self.toggle_player()
         self.get_player = cycle([1,2])
         self.current_player = self.get_player.next()
@@ -170,7 +174,19 @@ class bao_game():
         s += '\n'
         for i in range(2 * self.n_pits + 1, self.n_pits, -1):
             s += str(self.pits[i]) + '\t'
-        return s + '\nNext: Player {} \tGame State: {}\n'.format(self.current_player, 'Game Over' if self.game_over else 'Playing')
+        return s + '\nNext: Player {} \tGame State: {}\t Captures done:{}\t Last_pit: {}\n'.format(self.current_player, 'Game Over' if self.game_over else 'Playing', self.captures_done, self.last_pit)
+
+    @property
+    def score(self):
+        '''returns a list containing the current score [p1_score, p2_score]'''
+        scores = []
+        for player in [1,2]:
+            scores.append(self.pits[self.targets[player]].count_stones())
+        return scores
+
+    @property
+    def n_stones(self):
+        return len(self.stones)
 
     def initial_place(self, debug=False, direction='ccw'):
         '''Do the initial placement (sowing) of stones.
@@ -216,6 +232,81 @@ class bao_game():
         move = choice(pits_remaining)
         return move.id
 
+    def perform_captures(self):
+        '''Perform captures. Can only be done after a sow.
+        In this case, `captures_done` will be True, and
+        `last_pit` will indicate where the final sown stone ended.
+        '''
+        if self.captures_done == True:
+            if self.last_pit is None:
+                return # nothing to do
+            else:
+                raise RuntimeError, 'last_pit is set but captures done'
+
+        if self.last_pit is None:
+                raise RuntimeError, 'captures needed, but last_pit not set'
+
+        if self.pits[self.last_pit].player == self.current_player: # my pit
+            if self.pits[self.last_pit].count_stones() == 1: # potential capture
+
+                # Compute the pit opposite me. Note: pits always add to 2 * n_pits. e.g.
+                #        0  1  2  3  4  5  6  7(T)
+                # 13(T) 12 11 10  9  8  7  6
+                #       --------------------
+                #       12 12 12 12 12 12 12
+
+                opp_p = (len(self.pits) - 2) - self.last_pit
+                if self.pits[opp_p].count_stones():
+                    # capture occurs
+                    self.pits[opp_p].pickup_stones()
+                    self.pits[self.last_pit].pickup_stones()
+
+                    captured = (stone for stone in self.stones if stone.pit is None)
+                    try:
+                        while True:
+                            stone = captured.next()
+                            self.pits[self.targets[self.current_player]].add(stone)
+                    except StopIteration:
+                        pass
+
+        self.captures_done = True
+
+    def moves_available(self):
+        '''Return True if there are stones in non-target pits for the current player'''
+        left = [p.count_stones() for p in self.pits if p.player == self.current_player and p.target != True]
+        return (sum(left) > 0)
+
+
+    def handle_endgame(self):
+        '''Check if there are any valid moves for the current player.
+        If not, move opponent's stones to their target pit and declare the game over
+        '''
+        if (self.moves_available()):
+            return
+
+        self.current_player = self.get_player.next()
+
+        pits_remaining = [p for p in self.pits if p.player == self.current_player and p.target != True and p.count_stones()]
+        for p in pits_remaining:
+            p.pickup_stones()
+        endgame_captures = (stone for stone in self.stones if stone.pit is None)
+        try:
+            while True:
+                stone = endgame_captures.next()
+                self.pits[self.targets[self.current_player]].add(stone)
+        except StopIteration:
+            pass
+
+        self.game_over = True
+
+    def update_player(self):
+        if self.last_pit is None:
+            raise RuntimeError, 'update_player called and last_pit is None'
+        if not self.is_player_target(self.last_pit):
+            self.current_player = self.get_player.next()
+        self.last_pit = None
+
+
     def sow(self, pit_id, direction='ccw', debug=False):
         '''Current player picks up the seeds in pit `pit_id`,
         sowing in the direction specified by `direction`
@@ -223,13 +314,21 @@ class bao_game():
         '''
         if self.current_player != self.pits[pit_id].player:
             print("Not Your Turn!")
-            return
+            return False
         if self.pits[pit_id].count_stones() == 0:
             print("No stones here")
-            return
+            return False
         if self.pits[pit_id].target:
             print("can't sow a target")
-            return
+            return False
+        if self.captures_done == False:
+            print("Can't re-sow without first performing captures")
+            return False
+
+        self.captures_done = False
+        self.next_player = None
+
+        # Perform the sowing
         self.pits[pit_id].pickup_stones()
         unplaced = (stone for stone in self.stones if stone.pit is None)
         p = (pit_id + 1) % len(self.pits)
@@ -245,44 +344,17 @@ class bao_game():
                 p = (p + 1) % len(self.pits)
         except StopIteration:
             pass
-        if self.is_player_target(last_p):
-            # Landed in out target.
-            next_player = self.current_player
-        else:
-            next_player = self.get_player.next()
 
-            # compute captures
-            if self.pits[last_p].player == self.current_player: # my pit
-                if self.pits[last_p].count_stones() == 1: # potential capture
-                    opp_p = (len(self.pits) - 2) - last_p
-                    if self.pits[opp_p].count_stones():
-                        # capture occurs
-                        self.pits[opp_p].pickup_stones()
-                        self.pits[last_p].pickup_stones()
-                        unplaced = (stone for stone in self.stones if stone.pit is None)
-                        try:
-                            while True:
-                                stone = unplaced.next()
-                                self.pits[self.targets[self.current_player]].add(stone)
-                        except StopIteration:
-                            pass
-        self.current_player = next_player
-        left = [p.count_stones() for p in self.pits if p.player == self.current_player and p.target != True]
-        if (sum(left) == 0):
-            # move remaining stones to target
-            self.current_player = self.get_player.next()
-            pits_remaining = [p for p in self.pits if p.player == self.current_player and p.target != True and p.count_stones()]
-            for p in pits_remaining:
-                p.pickup_stones()
-            last_moves = (stone for stone in self.stones if stone.pit is None)
-            try:
-                while True:
-                    stone = last_moves.next()
-                    self.pits[self.targets[self.current_player]].add(stone)
-            except StopIteration:
-                pass
-            self.game_over = True
-        return (self.game_over, next_player, self.stones)
+        self.last_pit = last_p
+        # compute next player
+
+        self.perform_captures()
+
+        self.update_player()
+
+        self.handle_endgame()
+
+        return (self.game_over, self.current_player, self.stones)
 
 
 def random_game(bao = None, debug=False):
@@ -314,8 +386,7 @@ def random_game(bao = None, debug=False):
         try:
             (done, player, stones) = bao.sow(move)
         except:
-            print("Error on game: {}".format(move_list))
-            raise OverflowError
+            raise RuntimeError, "Error on game: {}".format(move_list)
 
     if debug:
         print(bao)
