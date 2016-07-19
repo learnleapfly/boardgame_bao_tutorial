@@ -1,4 +1,5 @@
-#:include debug.kv
+##:include debug.kv
+
 <BaoGame>:
     id: _game
     orientation: 'vertical'
@@ -13,14 +14,35 @@
     board_overlay: _board_overlay
     toolbar: _toolbar
 
+    curr_player: 1
+    scores: [0, 0]
+    turn_no: 1
+
     BoxLayout:
         id: _toolbar
         start_button: _start_button
+        score: _score
         size_hint: 1, 0.1
         Button:
             id: _start_button
             text: 'Start Game'
             on_release: root.start_game()
+        Label:
+            id: _score
+            game: _game
+            color: 0,0,0,1
+            markup: True
+            text: 'Score: [b]{} - {}[/b]'.format(*self.game.scores)
+        Label:
+            id: _score
+            color: 0,0,0,1
+            game: _game
+            text: 'Current Player: {}'.format(self.game.curr_player)
+        Label:
+            id: _score
+            color: 0,0,0,1
+            game: _game
+            text: 'Turn: {}'.format(self.game.turn_no)
 
     FloatLayout:
         id: _game_area
@@ -36,11 +58,11 @@
             pos_hint: {'center_x': 0.5, 'center_y': 0.5}
             padding: [self.width * 0.01, self.height * 0.18]
             spacing: self.width * 0.01
-            Pit:
+            GridLayout:
+                cols: 1
                 padding: [self.parent.parent.width * 0.018, self.parent.parent.height * 0.02]
-                pit_id: 13
-                text: str(self.pit_id)
-
+                Pit:
+                    pit_id: 13
             GridLayout:
                 id: _player_pits
                 size_hint: 6,1
@@ -83,19 +105,28 @@
                 Pit:
                     pit_id:5
                     text: str(self.pit_id)
-            Pit:
+            GridLayout:
+                cols: 1
                 padding: [self.parent.parent.width * 0.018, self.parent.parent.height * 0.02]
-                pit_id:6
-                text: str(self.pit_id)
+                Pit:
+                    pit_id:6
+                    text: str(self.pit_id)
 
 <Pit>:
     id: _pit
     text: ''
+    contents: _pit_contents
     FloatLayout:
+        id: _pit_contents
         size: self.size
         pos: self.pos
-        DebugLabel:
+        Button:
             size: self.parent.size
             pos: self.parent.pos
             text: root.text
+            background_color: 0,0,0,0
             on_release: root.choose_pit()
+
+<Stone>:
+    source: 'assets/graphics/stone.png'
+    color: 1,1,1,1
