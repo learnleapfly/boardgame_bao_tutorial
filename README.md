@@ -4,6 +4,9 @@
 This tutorial is about building a board game. It was inspired by some of the great work that was done at the Pycon 2016 Game Camp Sprint
 (In particular, the GoKivyGo project).
 
+**Bao** is a Swahili word that means _board_ or _board game_, and is a common form of game played in Eastern Africa. Bao is a Mancala-style game that involves sowing stones (or seeds) into pits (or houses). The version we will be implementing here is sometimes called Kalah, and is much simpler than the more traditional _bao la kujifunza_ or _bao la kiswahili_ games.
+
+
 # About Game Camp
 Game Camp is an open-source project aimed at helping anyone learn to make mobile games using Python, by developing teaching materials and tutorials that make the process fun and accessible. It is based on Python and Kivy, and targets Android and IOS devices. We are looking for developers, educators, designers from a wide variety of backgrounds and skill levels to help us develop the Game Camp materials.
 You can find the git repo and wiki at: http://github.com/learnleapfly/gamecamp
